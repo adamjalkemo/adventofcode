@@ -1,30 +1,82 @@
 from pathlib import Path
+
+import cv2
 import numpy as np
 
 with Path("input.txt").open() as f:
     lines = [line.strip() for line in f.readlines()]
 
-lines = [
+sample_lines = [
     "2199943210",
     "3987894921",
     "9856789892",
     "8767896789",
     "9899965678"
 ]
-lines = [np.array([int(x) for x in line]) for line in lines]
 
-risk_sum = 0
-for line in lines:
-    print(line)
-    d = np.diff(line)
-    mask = np.ones_like(line, dtype=bool)
+def lines_to_arr(lines):
+    return np.array([[int(x) for x in line] for line in lines])
+
+def get_min_neighbour_mask(arr):
+    #print(arr)
+    mask = np.zeros(arr.shape, dtype=np.bool)
+    for i in range(arr.shape[0]):
+        istart = max(0, i - 1)
+        istop = i + 1 + 1
+        for j in range(arr.shape[1]):
+            jstart = max(0, j - 1)
+            jstop = j + 1 + 1
+            patch_mask = arr[istart : istop,  jstart : jstop] > arr[i, j]
+            if np.sum(patch_mask == 0) == 1:
+                mask[i, j] = True
     #print(mask)
-    #print(d < 0)
-    #print(d > 0)
-    mask[1:] &= d < 0
-    mask[:-1] &= d > 0
-    risk_sum += np.sum(line[mask]) + np.sum(mask)
-    print(risk_sum)
-    print(mask)
-    #exit()
-print(risk_sum)
+    return mask
+
+def get_basin_size(arr, x, y):
+    mask = np.zeros(arr.shape, dtype=np.uint8)
+    mask[y, x] = True
+    mask_nines = arr == 9
+    kernel = np.array([
+        [0, 1, 0],
+        [1, 1, 1],
+        [0, 1, 0]
+    ], dtype=np.uint8)
+    prev_mask = np.zeros_like(mask)
+    while not (prev_mask == mask).all():
+        prev_mask = mask
+        mask = cv2.dilate(mask, kernel)
+        mask[mask_nines] = 0
+    return np.sum(mask)
+
+
+def part1():
+    arr = lines_to_arr(sample_lines)
+    mask = get_min_neighbour_mask(arr)
+    risk_level = np.sum(arr[mask] + 1)
+    assert risk_level == 15
+
+    arr = lines_to_arr(lines)
+    mask = get_min_neighbour_mask(arr)
+    risk_level = np.sum(arr[mask] + 1)
+    assert risk_level == 522
+
+def part2():
+    arr = lines_to_arr(sample_lines)
+    mask = get_min_neighbour_mask(arr)
+    coords = np.nonzero(mask)
+    basin_sizes = np.array([get_basin_size(arr, x, y) for y, x in zip(*coords)])
+    top_3_basin_sizes = -np.partition(-basin_sizes, 3)[:3]
+    prod = np.prod(top_3_basin_sizes)
+    assert prod == 1134
+
+    arr = lines_to_arr(lines)
+    mask = get_min_neighbour_mask(arr)
+    coords = np.nonzero(mask)
+    basin_sizes = np.array([get_basin_size(arr, x, y) for y, x in zip(*coords)])
+    top_3_basin_sizes = -np.partition(-basin_sizes, 3)[:3]
+    prod = np.prod(top_3_basin_sizes)
+    assert prod == 916688
+
+part1()
+
+part2()
